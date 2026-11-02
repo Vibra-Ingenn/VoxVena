@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+.env
+.env.local
+
+# Private data — never ship (Vox Vena / text-humanizer)
+data/
+voice/
+My-Conversations/
+.agents/
+
+# Local / build
+dist/
+*.log
+
+# Underscore directories = local-only (C:\Dev convention)
+**/_*/

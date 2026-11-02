@@ -1,0 +1,10 @@
+{
+  "voice_id": "example",
+  "label": "Example voice",
+  "summary": "Plain, direct sentences. No hype.",
+  "do": ["Use contractions", "Keep paragraphs short"],
+  "dont": ["Do not use em dashes every sentence", "Avoid delve and landscape"],
+  "lexicon_favor": [],
+  "exemplars": ["Here's what changed.", "That part is optional."],
+  "rewrite_targets": {}
+}
