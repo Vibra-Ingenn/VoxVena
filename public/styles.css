@@ -1,17 +1,19 @@
 :root
 {
-    --bg0: #0f1412;
-    --bg1: #1a2420;
-    --ink: #e8efe9;
-    --muted: #9aafa3;
-    --line: rgba(232, 239, 233, 0.12);
-    --accent: #d4a24c;
-    --accent_ink: #1a1408;
-    --panel: rgba(20, 28, 25, 0.82);
-    --danger: #e07a5f;
-    --font_display: "Fraunces", Georgia, serif;
-    --font_body: "IBM Plex Sans", system-ui, sans-serif;
-    --font_mono: "IBM Plex Mono", ui-monospace, monospace;
+    /* Same dark theme as adeptuscamini.com, Janus and Terminus (Linear values).
+       Colour only means something: indigo = main action, red = error. */
+    --bg0: #08090a;
+    --bg1: #0f1011;
+    --ink: #f7f8f8;
+    --muted: #8a8f98;
+    --line: #23252a;
+    --accent: #7170ff;
+    --accent_ink: #ffffff;
+    --panel: #0f1011;
+    --danger: #eb5757;
+    --font_display: "Inter", "Segoe UI", system-ui, sans-serif;
+    --font_body: "Inter", "Segoe UI", system-ui, sans-serif;
+    --font_mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
 *
@@ -31,23 +33,7 @@ body
 
 .atmosphere
 {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    background:
-        radial-gradient(1000px 500px at 10% -10%, rgba(212, 162, 76, 0.16), transparent 55%),
-        radial-gradient(800px 600px at 90% 20%, rgba(80, 140, 120, 0.18), transparent 50%),
-        linear-gradient(165deg, #121a17 0%, #0f1412 45%, #15201b 100%);
-    pointer-events: none;
-}
-
-.atmosphere::after
-{
-    content: "";
-    position: absolute;
-    inset: 0;
-    opacity: 0.05;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    display: none;
 }
 
 .shell
@@ -66,7 +52,7 @@ body
     font-size: 0.8rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--accent);
+    color: var(--muted);
 }
 
 .hero h1
@@ -75,9 +61,9 @@ body
     max-width: 16ch;
     font-family: var(--font_display);
     font-size: clamp(2rem, 5vw, 3.4rem);
-    font-weight: 700;
-    line-height: 1.05;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
 }
 
 .lede
@@ -99,7 +85,7 @@ body
     padding: 1rem 1.1rem;
     background: var(--panel);
     border: 1px solid var(--line);
-    backdrop-filter: blur(8px);
+    border-radius: 12px;
 }
 
 .field
@@ -133,9 +119,9 @@ select
     width: 100%;
     padding: 0.65rem 0.75rem;
     color: var(--ink);
-    background: #0c110f;
+    background: #141516;
     border: 1px solid var(--line);
-    border-radius: 0;
+    border-radius: 8px;
 }
 
 .check
@@ -163,6 +149,7 @@ select
 {
     cursor: pointer;
     border: 1px solid transparent;
+    border-radius: 9px;
     padding: 0.7rem 1.1rem;
 }
 
@@ -170,12 +157,12 @@ select
 {
     background: var(--accent);
     color: var(--accent_ink);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .primary:hover
 {
-    filter: brightness(1.05);
+    filter: brightness(1.08);
 }
 
 .primary:disabled
@@ -189,6 +176,7 @@ select
     background: transparent;
     color: var(--ink);
     border-color: var(--line);
+    border-radius: 6px;
     padding: 0.2rem 0.55rem;
     font-size: 0.72rem;
     font-family: var(--font_mono);
@@ -226,13 +214,13 @@ textarea
     color: var(--ink);
     background: var(--panel);
     border: 1px solid var(--line);
+    border-radius: 12px;
     line-height: 1.55;
-    backdrop-filter: blur(8px);
 }
 
 textarea:focus
 {
-    outline: 1px solid rgba(212, 162, 76, 0.55);
+    outline: 1px solid rgba(113, 112, 255, 0.6);
 }
 
 .status
