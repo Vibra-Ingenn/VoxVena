@@ -30,7 +30,9 @@ Three strengths:
 
 ## Run it
 
-You need [Node.js](https://nodejs.org) 22 or newer.
+**Windows, no setup:** download **[VoxVena-windows.zip](../../releases/latest/download/VoxVena-windows.zip)**, unzip it, and double-click `Start Vox Vena.bat`. It comes with everything it needs (Node.js included). Windows may say "Windows protected your PC" the first time because Vox Vena is new: click **More info**, then **Run anyway**.
+
+**From source** (any system): you need [Node.js](https://nodejs.org) 22 or newer.
 
 ```bash
 npm install
