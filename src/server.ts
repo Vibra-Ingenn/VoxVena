@@ -74,5 +74,5 @@ app.post("/api/humanize", async (req, res) =>
 
 app.listen(port, "127.0.0.1", () =>
 {
-    console.log(`Text Humanizer running at http://127.0.0.1:${port}`);
+    console.log(`Vox Vena running at http://127.0.0.1:${port}`);
 });

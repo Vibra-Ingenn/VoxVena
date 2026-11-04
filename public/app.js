@@ -76,7 +76,7 @@ run_btn.addEventListener("click", async () =>
         if (unchanged)
         {
             set_status(
-                `No changes made${llm_part}. Not a stuck model — this text had no AI/tech-plan phrases to strip. Paste raw ChatGPT output.`,
+                `No changes made${llm_part}. Nothing is broken: this text has none of the AI habits Vox Vena looks for.`,
                 true
             );
             return;
@@ -85,8 +85,16 @@ run_btn.addEventListener("click", async () =>
         const hit_part = data.hit_count
             ? `${data.hit_count} fix(es): ${data.hits.slice(0, 8).join(", ")}${data.hits.length > 8 ? "…" : ""}`
             : "wording changed";
-        const skip_note = llm_skipped ? ` · ${(data.notes || []).find((n) => String(n).startsWith("llm_skipped"))}` : "";
-        set_status(`${hit_part}${llm_part}${skip_note}`);
+        const skip_reason = String((data.notes || []).find((n) => String(n).startsWith("llm_skipped")) || "")
+            .replace(/^llm_skipped:\s*/, "");
+        const skip_note = !llm_skipped ? ""
+            : skip_reason === "light_is_local_only"
+                ? " · Light never uses the AI; pick Medium or Heavy for that"
+                : ` · AI rewrite thrown away (${skip_reason}), showing the rules-only version`;
+        const barely_note = (data.notes || []).includes("llm_barely_changed")
+            ? " · the AI kept most sentences as they were; a bigger model usually changes more"
+            : "";
+        set_status(`${hit_part}${llm_part}${skip_note}${barely_note}`);
     }
     catch (err)
     {

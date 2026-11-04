@@ -1,4 +1,5 @@
 import type { Intensity } from "./humanize.js";
+import { strip_model_leaks } from "./spoken_pass.js";
 import { load_voice_style, voice_prompt_block } from "./voice.js";
 
 /**
@@ -50,37 +51,34 @@ async function call_roughen(
     const voice_block = voice_prompt_block(voice);
 
     const touch = force_harder
-        ? "HARD: Make it LESS polished. Shorter blunt lines. Spoken. No blog tone."
+        ? "HARD: Make it LESS polished. Shorter blunt lines. No blog tone."
         : intensity === "heavy"
-            ? "Roughen hard into spoken voice. Keep facts. Kill polish."
-            : "Make it a bit more spoken and less polished. Keep facts.";
+            ? "Rewrite it hard: new order, plain words, no outline. Keep facts. Kill polish."
+            : "Make it a bit plainer and less polished. Keep facts.";
 
     const system = [
         "You REMOVE polish, tech-manual voice, and artificial AI essay structures.",
-        "Rewrite like explaining to a friend out loud in conversation — not a blog, not a textbook, not an AI summary.",
+        "Rewrite it the way the person would write it themselves: plain, direct, a little uneven. Not a blog, not a textbook, not a chatbot answer.",
         "If your rewrite sounds cleaner, smarter, more labeled, or more structured than the draft, you failed.",
-        "Keep facts and key technical details. Flatten bullet points with bold headers into natural conversation.",
+        "Keep facts and key technical details.",
         "",
         voice_block,
         "",
         "RULES:",
         "1. Keep the same facts, numbers, and code/pseudocode.",
         "2. Do NOT expand length or invent filler.",
-        "3. Ban: On the other hand, As for, Furthermore, Additionally, Overall, In conclusion, That said, It's worth noting, So let's, Here's how, hands down, textbook, delve, seamless, robust, which means, in other words, testament to, beacon of, cornerstone, pivotal, crucial role, double-edged sword, at its core, ultimate, in essence.",
-        "4. Prefer: so, and, because, like, basically, you know, stuff.",
-        "5. Output ONLY the roughened text.",
-        "",
-        "BAD (too AI / too polished):",
-        "Function A is hands down the most efficient. Here's how it works. On the other hand, Function C is okay but wasteful. As for space...",
-        "",
-        "GOOD (spoken):",
-        "This one is all about Function A - by far the most efficient. Here are the 3 broken down. Function C works but it's wasteful. Function B is the killer on space.",
+        "3. Do not keep the draft's outline. No headings, no numbered sections, no bullet lists. You may put the points in a different order, and you don't have to give every point its own paragraph.",
+        "4. Vary it: some sentences short, some long; paragraphs of different lengths.",
+        "5. Ban: On the other hand, As for, Furthermore, Additionally, Overall, In conclusion, That said, It's worth noting, So let's, Here's how, hands down, textbook, delve, seamless, robust, which means, in other words, testament to, beacon of, cornerstone, pivotal, crucial role, double-edged sword, at its core, ultimate, in essence.",
+        "6. Also ban these chatbot habits: Let me break it down, Here's the thing, The thing is, Think about it this way, Here's what happens, Here's where it gets interesting, the mind-blowing part, So you want to know...?, Okay so, any question used as a hook, any mention of 'your question' or an earlier conversation, and any ending that offers more ('you could ask', 'let me know', 'want me to', 'worth exploring next').",
+        "7. Don't fake casual talk. No 'like', 'basically', 'you know', 'and stuff', 'pretty much' unless the draft already uses them.",
+        "8. Output ONLY the rewritten text.",
         "",
         touch
     ].filter(Boolean).join("\n");
 
     const user = [
-        "Roughen this. Do not polish it. Do not keep markdown bold headers or robotic bullet lists.",
+        "Rewrite this. Do not polish it. Do not keep its headings, section order, or lists.",
         "",
         "--- DRAFT ---",
         text,
@@ -128,6 +126,7 @@ async function call_roughen(
         .replace(/^(?:Edited|Stripped|Rewritten|Humanized|Roughened)(?: draft)?:?\s*/i, "")
         .trim();
 
+    content = strip_model_leaks(content).text;
     content = restore_mangled_symbols(text, content);
     content = strip_llm_added_tells(content);
     return content;

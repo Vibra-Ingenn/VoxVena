@@ -14,22 +14,22 @@
   <main class="shell">
     <header class="hero">
       <p class="brand">Vox Vena</p>
-      <h1>Make it sound like a conversation.</h1>
-      <p class="lede">Paste ChatGPT text. Light kills manual/blueprint voice — Big-O jargon, section labels, code-block layout — so it reads like talking to someone, not a rocket schematic. Leave LLM off.</p>
+      <h1>Make it sound like you said it.</h1>
+      <p class="lede">Paste something your AI helped you write. Vox Vena takes out the chatbot habits and the stiff wording, and keeps what you meant. It runs on this PC. The AI box is optional; leave it off if the text already sounds like you.</p>
     </header>
 
     <section class="controls">
       <label class="field">
         <span>Intensity</span>
         <select id="intensity">
-          <option value="light" selected>Light — strip AI + tech-plan voice (recommended)</option>
-          <option value="medium">Medium — + structure cleanup</option>
-          <option value="heavy">Heavy — optional LLM roughen (can polish wrong)</option>
+          <option value="light" selected>Light — swap AI phrases and chatbot habits, keep the layout</option>
+          <option value="medium">Medium — + drop headings, turn lists into sentences</option>
+          <option value="heavy">Heavy — + cut warm-up and wrap-up lines</option>
         </select>
       </label>
       <label class="check">
         <input type="checkbox" id="use_llm" />
-        <span>LLM roughen (off = safer; ignored on Light)</span>
+        <span>Also rewrite with my AI (Medium and Heavy only)</span>
       </label>
       <button type="button" id="run_btn" class="primary">Humanize</button>
     </section>

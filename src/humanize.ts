@@ -1,13 +1,23 @@
-import { phrase_replacements, structural_cleanup } from "./ai_tells.js";
+import { chat_leftovers, phrase_replacements, structural_cleanup, type Replacement } from "./ai_tells.js";
 import { rewrite_with_llm } from "./llm.js";
 import { load_voice_style } from "./voice.js";
 import {
     apply_contractions,
+    drop_warmup_and_wrapup,
+    even_out_quotes,
     flatten_manual_to_talk,
+    flatten_short_lists,
+    limit_repeated_openers,
+    merge_one_line_paragraphs,
     spoken_replacements,
     strip_big_o_jargon,
+    strip_chat_paste_junk,
     strip_leading_paste_noise,
-    strip_tech_plan_voice
+    strip_markdown_headings,
+    strip_model_leaks,
+    strip_tech_plan_voice,
+    unbullet_long_items,
+    unwrap_hard_wrapped_lines
 } from "./spoken_pass.js";
 
 export type Intensity = "light" | "medium" | "heavy";
@@ -30,13 +40,14 @@ export type Humanize_result =
 
 /**
  * Local AI-tell strip first. Light never uses the LLM (small models polish).
- * Medium/heavy may roughen with LLM if requested.
+ * Medium/heavy may roughen with LLM if requested; the local rules then run again
+ * on the LLM output, because models put their own chatbot habits back in.
  */
 export async function humanize(req: Humanize_request): Promise<Humanize_result>
 {
     const intensity = req.intensity ?? "light";
     const notes: string[] = [];
-    let text = (req.text ?? "").replace(/^\uFEFF/, "").trim();
+    let text = (req.text ?? "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trim();
 
     if (!text)
     {
@@ -71,87 +82,7 @@ export async function humanize(req: Humanize_request): Promise<Humanize_result>
     }
 
     const before_local = text;
-
-    for (const rule of phrase_replacements)
-    {
-        const next = text.replace(rule.pattern, rule.replace_with as string);
-        if (next !== text)
-        {
-            hits.push(rule.label);
-            text = next;
-        }
-    }
-
-    for (const rule of spoken_replacements)
-    {
-        const next = text.replace(rule.pattern, rule.replace_with as string);
-        if (next !== text)
-        {
-            hits.push(rule.label);
-            text = next;
-        }
-    }
-
-    for (const rule of structural_cleanup)
-    {
-        const next = text.replace(rule.pattern, rule.replace_with as string);
-        if (next !== text)
-        {
-            hits.push(rule.label);
-            text = next;
-        }
-    }
-
-    text = fix_articles(text);
-    text = depolish_technical_labels(text, hits);
-
-    const big_o = strip_big_o_jargon(text);
-    if (big_o.hit)
-    {
-        hits.push("big-O jargon");
-        text = big_o.text;
-        notes.push("big_o_strip");
-    }
-
-    const tech = strip_tech_plan_voice(text);
-    if (tech.hit)
-    {
-        hits.push("tech plan voice");
-        text = tech.text;
-        notes.push("tech_plan_strip");
-    }
-
-    const talk = flatten_manual_to_talk(text);
-    if (talk.hit)
-    {
-        hits.push("manual-to-conversation");
-        text = talk.text;
-        notes.push("conversation_shape");
-    }
-
-    // Light always loosens formal wording (still no LLM).
-    const contracted = apply_contractions(text);
-    if (contracted !== text)
-    {
-        hits.push("contractions");
-        text = contracted;
-        notes.push("spoken_pass");
-    }
-
-    if (intensity !== "light")
-    {
-        text = soften_list_cadence(text);
-        text = break_uniform_paragraphs(text);
-        notes.push("structure_pass");
-    }
-
-    if (intensity === "heavy")
-    {
-        notes.push("imperfection_pass");
-    }
-
-    text = tidy_casing_after_edits(text);
-    text = text.replace(/[ \t]+\n/g, "\n").trim();
+    text = local_pass(text, intensity, hits, notes);
 
     if (text === before_local)
     {
@@ -170,6 +101,7 @@ export async function humanize(req: Humanize_request): Promise<Humanize_result>
             const before_llm = text;
             text = await rewrite_with_llm(text, intensity);
             used_llm = true;
+            text = local_pass(text, intensity, hits, []);
             if (text === before_llm)
             {
                 notes.push("llm_rewrite_noop");
@@ -177,6 +109,10 @@ export async function humanize(req: Humanize_request): Promise<Humanize_result>
             else
             {
                 notes.push("llm_roughen");
+                if (share_of_sentences_kept(before_llm, text) >= 0.7)
+                {
+                    notes.push("llm_barely_changed");
+                }
             }
         }
         catch (err)
@@ -206,6 +142,98 @@ export async function humanize(req: Humanize_request): Promise<Humanize_result>
         used_llm,
         notes
     };
+}
+
+// Some models hand the text back almost word for word. Share of the longer sentences that came back unchanged.
+function share_of_sentences_kept(before: string, after: string): number
+{
+    const flat = (s: string) => s.replace(/\s+/g, " ").trim();
+    const sentences = (before.match(/[^.!?\n]+[.!?]/g) || []).map(flat).filter((s) => s.split(" ").length >= 6);
+    if (sentences.length === 0)
+    {
+        return 0;
+    }
+    const out = flat(after);
+    return sentences.filter((s) => out.includes(s)).length / sentences.length;
+}
+
+function apply_rules(text: string, rules: Replacement[], hits: string[]): string
+{
+    for (const rule of rules)
+    {
+        const next = text.replace(rule.pattern, rule.replace_with as string);
+        if (next !== text)
+        {
+            hits.push(rule.label);
+            text = next;
+        }
+    }
+    return text;
+}
+
+function run_step(text: string, step: (t: string) => { text: string; hit: boolean }, label: string, hits: string[], notes: string[]): string
+{
+    const r = step(text);
+    if (r.hit)
+    {
+        hits.push(label);
+        notes.push(label.replace(/[ -]/g, "_"));
+    }
+    return r.text;
+}
+
+/** Every rule that needs no model. Safe to run twice (it runs again on LLM output). */
+function local_pass(text: string, intensity: Intensity, hits: string[], notes: string[]): string
+{
+    const structured = intensity !== "light";
+
+    text = run_step(text, strip_model_leaks, "model leftovers", hits, notes);
+    text = run_step(text, even_out_quotes, "mixed quote marks", hits, notes);
+    text = run_step(text, unwrap_hard_wrapped_lines, "pdf line breaks", hits, notes);
+    text = run_step(text, strip_chat_paste_junk, "chatgpt links", hits, notes);
+    text = run_step(text, (t) => strip_markdown_headings(t, structured), "markdown headings", hits, notes);
+    if (structured)
+    {
+        text = run_step(text, flatten_short_lists, "short lists", hits, notes);
+        text = run_step(text, unbullet_long_items, "long bullets", hits, notes);
+    }
+
+    text = apply_rules(text, chat_leftovers, hits);
+    text = apply_rules(text, phrase_replacements, hits);
+    text = apply_rules(text, spoken_replacements, hits);
+    text = apply_rules(text, structural_cleanup, hits);
+
+    text = fix_articles(text);
+    text = depolish_technical_labels(text, hits);
+
+    text = run_step(text, strip_big_o_jargon, "big-O jargon", hits, notes);
+    text = run_step(text, strip_tech_plan_voice, "tech plan voice", hits, notes);
+    text = run_step(text, flatten_manual_to_talk, "manual-to-conversation", hits, notes);
+
+    // Light always loosens formal wording (still no LLM).
+    const contracted = apply_contractions(text);
+    if (contracted !== text)
+    {
+        hits.push("contractions");
+        text = contracted;
+    }
+
+    if (structured)
+    {
+        text = soften_list_cadence(text);
+        text = break_uniform_paragraphs(text);
+        text = run_step(text, merge_one_line_paragraphs, "one-line paragraphs", hits, notes);
+    }
+
+    if (intensity === "heavy")
+    {
+        text = run_step(text, drop_warmup_and_wrapup, "warm-up and wrap-up lines", hits, notes);
+    }
+
+    text = run_step(text, (t) => limit_repeated_openers(t, intensity === "heavy" ? 1 : 2), "repeated openers", hits, notes);
+
+    text = tidy_casing_after_edits(text);
+    return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function depolish_technical_labels(text: string, hits: string[]): string
@@ -241,6 +269,7 @@ function soften_list_cadence(text: string): string
         .replace(/^First,\s+/gim, "")
         .replace(/^Second,\s+/gim, "Next, ")
         .replace(/^Third,\s+/gim, "Then ")
+        .replace(/^Fourth,\s+/gim, "")
         .replace(/^Finally,\s+/gim, "Last, ");
 }
 
@@ -275,7 +304,8 @@ function break_uniform_paragraphs(text: string): string
 function tidy_casing_after_edits(text: string): string
 {
     // Capitalize starts of sentences after we stripped lead-ins.
-    return text.replace(/(^|[.!?]\s+)([a-z])/g, (_, left: string, ch: string) =>
+    // Not after "..." ("They're more like... clouds" stays lowercase).
+    return text.replace(/(^|(?<!\.\.)[.!?]\s+)([a-z])/g, (_, left: string, ch: string) =>
     {
         return left + ch.toUpperCase();
     }).replace(/(^|\n)([a-z])/g, (_, left: string, ch: string) =>

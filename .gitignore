@@ -13,5 +13,5 @@ My-Conversations/
 dist/
 *.log
 
-# Underscore directories = local-only (C:\Dev convention)
+# Underscore directories = local-only
 **/_*/

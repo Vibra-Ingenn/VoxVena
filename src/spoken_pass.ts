@@ -38,7 +38,8 @@ export const spoken_replacements: Replacement[] =
     { pattern: /\bWe can observe that\b/gi, replace_with: "", label: "we can observe" },
     { pattern: /\bIt is clear that\b/gi, replace_with: "", label: "it is clear that" },
     { pattern: /\bHave you ever wondered\s+[^?]+\?\s*/gi, replace_with: "", label: "rhetorical question opener" },
-    { pattern: /\bWhy does this matter\?\s*/gi, replace_with: "", label: "rhetorical why does this matter" },
+    // Kept when the answer starts "Because ...", or that answer would be left hanging.
+    { pattern: /\bWhy does this matter\?(?!\s*Because\b)\s*/gi, replace_with: "", label: "rhetorical why does this matter" },
     { pattern: /\bTaking everything into account,?\s*/gi, replace_with: "So, ", label: "taking everything into account" },
 
     // Tech-plan / CS-doc voice -> human talk
@@ -78,8 +79,6 @@ export const spoken_replacements: Replacement[] =
     verb("leverag", "es|ed|ing|e", ["use", "uses", "used", "using"], "leverage spoken"),
     { pattern: /\bfacilitate(?:s|d)?\b/gi, replace_with: "help", label: "facilitate" },
     { pattern: /\bmethodology\b/gi, replace_with: "method", label: "methodology" },
-    { pattern: /\barchitecture\b/gi, replace_with: "setup", label: "architecture" },
-    { pattern: /\binfrastructure\b/gi, replace_with: "setup", label: "infrastructure" },
     { pattern: /\bcomprehensive\b/gi, replace_with: "full", label: "comprehensive" },
     { pattern: /\bsubsequently,?\s*/gi, replace_with: "Then ", label: "subsequently" },
     { pattern: /\baccordingly,?\s*/gi, replace_with: "So ", label: "accordingly" },
@@ -396,9 +395,16 @@ function soften_memory_lead(rest: string): string
     return `And memory-wise, ${t.charAt(0).toLowerCase()}${t.slice(1)}`;
 }
 
+// Only real pseudocode counts. "For example:" or "If you push..." is a sentence, not code.
 function is_codeish_line(line: string): boolean
 {
-    return /^(for |if |return |while |else|factors\s*=|\/\/|#)/i.test(line)
+    if (/[.!?]$/.test(line) || /^(?:for|if)\s+(?:example|instance)\b/i.test(line))
+    {
+        return false;
+    }
+    return /^(?:for|while)\s+\w+\s+(?:in|from)\b/i.test(line)
+        || (/^if\s/i.test(line) && /==|!=|<=|>=|\bmod\b|\breturn\b/.test(line))
+        || /^(?:return\s|else\b|factors\s*=|\/\/)/i.test(line)
         || (/^[a-z_][a-z0-9_]*\s*=/.test(line) && !/\b(is|are|was|the)\b/i.test(line));
 }
 
@@ -469,4 +475,324 @@ export function strip_tech_plan_voice(text: string): { text: string; hit: boolea
     });
 
     return { text: out.join("\n"), hit };
+}
+
+const chat_link_line = /^\s*!?\[[^\]\n]*\]\((?:https?:\/\/images\.openai\.com\/[^)\s]*|https?:\/\/www\.google\.com\/s2\/favicons[^)\s]*|[^)\s]*utm_source=chatgpt\.com[^)\s]*)\)\s*$/i;
+
+/**
+ * Leftovers from the model itself: Gemma's thinking-channel tags, <think> blocks, chat tokens,
+ * and "---ROUGH---" style markers. Notes after a closing marker are the model talking to itself (Qwen3), so they go too.
+ */
+export function strip_model_leaks(text: string): { text: string; hit: boolean }
+{
+    let out = text
+        .replace(/<think>[\s\S]*?<\/think>\s*/gi, "")
+        .replace(/<\|channel>[\s\S]*?<channel\|>\s*/g, "")
+        .replace(/<\|(?:im_start|im_end|end|eot_id|start_header_id|end_header_id)\|>/g, "");
+
+    const parts = out.split(/^[ \t]*-{2,}[ \t]*(?:ROUGH(?:ENED)?|DRAFT|END|REWRITE|OUTPUT)[ \t]*-{2,}[ \t]*$/im);
+    if (parts.length > 1)
+    {
+        out = parts[0].trim() ? parts[0] : parts[1];
+    }
+
+    out = out.trim();
+    return { text: out, hit: out !== text.trim() };
+}
+
+/** Models mix curly and straight apostrophes in one answer ("He’s" next to "it's"); people type one kind. Mixed -> straight. */
+export function even_out_quotes(text: string): { text: string; hit: boolean }
+{
+    if (!/[’‘“”]/.test(text) || !/['"]/.test(text))
+    {
+        return { text, hit: false };
+    }
+    const out = text.replace(/[’‘]/g, "'").replace(/[“”]/g, "\"");
+    return { text: out, hit: out !== text };
+}
+
+/**
+ * Pasted ChatGPT answers carry its web-search leftovers: image cards from images.openai.com and
+ * source links tagged utm_source=chatgpt.com. Drop those lines and the tag; other links stay.
+ */
+export function strip_chat_paste_junk(text: string): { text: string; hit: boolean }
+{
+    const before = text;
+    let out = text
+        .split("\n")
+        .filter((line) => !chat_link_line.test(line))
+        .join("\n");
+
+    // Inline citation chips: "([site.com](https://...utm_source=chatgpt.com))"
+    out = out.replace(/\s*\(\[[^\]\n]*\]\([^)\s]*utm_source=chatgpt\.com[^)\s]*\)\)/gi, "");
+    // The tag itself on any link that's left, "?utm_source=..." or "&utm_source=..." (also "\&")
+    out = out.replace(/\\?&utm_source=chatgpt\.com/gi, "");
+    out = out.replace(/\?utm_source=chatgpt\.com(?:\\?&)?/gi, (m) => (m.endsWith("&") ? "?" : ""));
+    // HTML space codes left by copy buttons
+    out = out.replace(/&#x20;|&#32;|&nbsp;/gi, " ").replace(/[ \t]+$/gm, "");
+    out = out.replace(/\n{3,}/g, "\n\n");
+
+    return { text: out, hit: out !== before };
+}
+
+/**
+ * Markdown headings ("# 1. What is an atom?") are the outline readers notice first.
+ * Light keeps the words as a plain line; Medium and Heavy drop the heading line.
+ * Runs before flatten_manual_to_talk, which would read "#" as a code comment.
+ */
+export function strip_markdown_headings(text: string, drop: boolean): { text: string; hit: boolean }
+{
+    let hit = false;
+    const out: string[] = [];
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++)
+    {
+        const line = lines[i];
+        const m = line.match(/^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/);
+        if (!m)
+        {
+            // Medium/Heavy: a short title line with blank lines around it is a heading too.
+            const standalone = (i === 0 || !lines[i - 1].trim()) && (i + 1 >= lines.length || !lines[i + 1].trim());
+            const title = /^[A-Z0-9"][^.!?:;,]*$/.test(line.trim()) && line.trim().split(/\s+/).length <= 8;
+            if (drop && i > 0 && standalone && title)
+            {
+                hit = true;
+                continue;
+            }
+            out.push(line);
+            continue;
+        }
+        hit = true;
+        if (!drop)
+        {
+            out.push(m[1].replace(/^\d+[.)]\s+/, ""));
+        }
+    }
+    return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), hit };
+}
+
+const list_item = /^\s*(?:[-*+•]|\d+[.)])\s+(.+)$/;
+
+/**
+ * Bullet and numbered lists of short items become plain sentences in one paragraph.
+ * Long items (a paragraph each) stay as they are.
+ */
+export function flatten_short_lists(text: string): { text: string; hit: boolean }
+{
+    const lines = text.split("\n");
+    const out: string[] = [];
+    let hit = false;
+    let i = 0;
+
+    while (i < lines.length)
+    {
+        if (!list_item.test(lines[i]))
+        {
+            out.push(lines[i]);
+            i += 1;
+            continue;
+        }
+
+        const items: string[] = [];
+        let j = i;
+        while (j < lines.length)
+        {
+            const m = lines[j].match(list_item);
+            if (m)
+            {
+                items.push(m[1].trim());
+                j += 1;
+                continue;
+            }
+            // Blank lines between items don't end the list.
+            if (!lines[j].trim() && j + 1 < lines.length && list_item.test(lines[j + 1]))
+            {
+                j += 1;
+                continue;
+            }
+            break;
+        }
+
+        const short = items.every((s) => s.split(/\s+/).length <= 25);
+        if (items.length < 2 || !short)
+        {
+            out.push(...lines.slice(i, j));
+            i = j;
+            continue;
+        }
+
+        const sentences = items.map((s) =>
+        {
+            const t = s.charAt(0).toUpperCase() + s.slice(1);
+            return /[.!?:;]$/.test(t) ? t.replace(/[:;]$/, ".") : `${t}.`;
+        });
+        out.push(sentences.join(" "));
+        hit = true;
+        i = j;
+    }
+
+    return { text: out.join("\n"), hit };
+}
+
+/**
+ * "So ... So ... So ..." and "Also ... Also ..." openers read like hidden section headings.
+ * Keep the first few, then drop the marker word (the sentence itself stays).
+ */
+export function limit_repeated_openers(text: string, keep: number): { text: string; hit: boolean }
+{
+    const before = text;
+    let so_seen = 0;
+    let out = text.replace(/(^|[.!?]\s+|\n)(?:Okay,?\s+)?So,?\s+(?=[A-Za-z])/g, (m, lead: string) =>
+    {
+        so_seen += 1;
+        return so_seen <= keep ? m : lead;
+    });
+
+    // Two "Also," sentences in a row: the second becomes "And".
+    out = out.replace(/(\bAlso, [^.!?\n]*[.!?]\s+)Also,\s+/g, "$1And ");
+
+    return { text: out, hit: out !== before };
+}
+
+/**
+ * Heavy only: delete warm-up and wrap-up sentences that carry no facts
+ * ("This is actually one of the most fascinating things in physics...", "The thought I'd like you to take away").
+ */
+export function drop_warmup_and_wrapup(text: string): { text: string; hit: boolean }
+{
+    const before = text;
+    const out = text
+        .replace(/^This is (?:actually )?one of the most (?:fascinating|interesting|important|amazing) [^.:\n]*[:.]\s*/gim, "")
+        .replace(/^(?:The (?:thought|one thing|big idea) I'd like you to take away|Here's the big picture|The bottom line)[:.]?\s*$/gim, "")
+        .replace(/(?:^|\s)And (?:that's|this is) (?:one of )?the most (?:extraordinary|fascinating|amazing|remarkable|beautiful) [^.!\n]*[.!]/gim, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    return { text: out, hit: out !== before.trim() };
+}
+
+const paragraph_sizes = [3, 2, 4, 2, 3];
+
+function is_one_liner(block: string): boolean
+{
+    const t = block.trim();
+    // Must end like a sentence: a bare title line ("The Garden Survey Results") is never joined.
+    return !t.includes("\n")
+        && t.length < 240
+        && /[.!?:]["')]?$/.test(t)
+        && !list_item.test(t)
+        && (t.match(/[.!?]+(?:\s|$)/g) || []).length <= 1;
+}
+
+/**
+ * ChatGPT puts every sentence in its own paragraph. Join runs of one-sentence paragraphs
+ * into paragraphs of different sizes. Only joins lines, never edits a sentence.
+ */
+export function merge_one_line_paragraphs(text: string): { text: string; hit: boolean }
+{
+    const blocks = text.split(/\n{2,}/);
+    const out: string[] = [];
+    let hit = false;
+    let size_at = 0;
+    let i = 0;
+
+    while (i < blocks.length)
+    {
+        if (!is_one_liner(blocks[i]))
+        {
+            out.push(blocks[i]);
+            i += 1;
+            continue;
+        }
+
+        let j = i;
+        while (j < blocks.length && is_one_liner(blocks[j]))
+        {
+            j += 1;
+        }
+        const run = blocks.slice(i, j).map((b) => b.trim());
+        if (run.length < 2)
+        {
+            out.push(...run);
+            i = j;
+            continue;
+        }
+
+        const run_start = out.length;
+        let group: string[] = [];
+        let want = paragraph_sizes[size_at % paragraph_sizes.length];
+        for (const line of run)
+        {
+            group.push(line);
+            // A line ending in ":" always stays with the line after it.
+            if (group.length >= want && !line.endsWith(":"))
+            {
+                out.push(group.join(" "));
+                group = [];
+                size_at += 1;
+                want = paragraph_sizes[size_at % paragraph_sizes.length];
+            }
+        }
+        if (group.length)
+        {
+            // One line left over joins the run's last paragraph instead of standing alone.
+            if (group.length === 1 && out.length > run_start)
+            {
+                out[out.length - 1] += " " + group[0];
+            }
+            else
+            {
+                out.push(group.join(" "));
+            }
+        }
+        hit = true;
+        i = j;
+    }
+
+    // "For example:" at the end of a paragraph joins the paragraph it introduces.
+    // Not when the next paragraph opens with its own "Label:" (that would read "setup: The Board: ...").
+    const joined = out.join("\n\n").replace(/:\n\n(?=[A-Z])(?![^.:\n]{0,50}:)/g, ": ");
+    return { text: joined, hit: hit || joined !== text };
+}
+
+/**
+ * Text copied out of a PDF breaks every line in the middle of a sentence. Join those lines back up,
+ * or the casing tidy would capitalize each one. Short lines (code, lists, addresses) are left alone.
+ */
+export function unwrap_hard_wrapped_lines(text: string): { text: string; hit: boolean }
+{
+    const lines = text.split("\n");
+    const out: string[] = [];
+    let hit = false;
+
+    for (const line of lines)
+    {
+        const prev = out.length ? out[out.length - 1] : "";
+        if (prev.length >= 50 && !/[.!?:]["')]?\s*$/.test(prev) && /^[a-z(]/.test(line))
+        {
+            out[out.length - 1] = prev.replace(/\s+$/, "") + " " + line;
+            hit = true;
+            continue;
+        }
+        out.push(line);
+    }
+
+    return { text: out.join("\n"), hit };
+}
+
+/** Medium/Heavy: long bullet items (a paragraph each) lose the bullet and become plain paragraphs. */
+export function unbullet_long_items(text: string): { text: string; hit: boolean }
+{
+    let hit = false;
+    const out = text.split("\n").map((line) =>
+    {
+        const m = line.match(/^\s*(?:[-*+•]|\d+[.)])\s+(.+)$/);
+        if (m && m[1].split(/\s+/).length > 25)
+        {
+            hit = true;
+            return "\n" + m[1].trim() + "\n";
+        }
+        return line;
+    });
+    return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), hit };
 }

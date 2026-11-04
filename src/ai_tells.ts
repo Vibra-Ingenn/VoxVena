@@ -140,6 +140,61 @@ export const phrase_replacements: Replacement[] =
     { pattern: /\bconversely,?\s*/gi, replace_with: "On the flip side, ", label: "conversely" }
 ];
 
+// Chatbot habits people spot first in pasted AI answers (from our test rounds, 2026-11):
+// "let me break it down" pivots, references to a chat the reader never saw, and "want to know more?" sign-offs.
+// Each one deletes a whole lead-in or sentence, so grammar stays intact.
+export const chat_leftovers: Replacement[] =
+[
+    // Assistant openers
+    { pattern: /^(?:Absolutely|Certainly|Sure|Of course|Great question)[!.,]\s*/gim, replace_with: "", label: "assistant opener" },
+    { pattern: /^So,? you (?:want|wanna) (?:me to )?[^.?!\n]*[.?]\s*(?:I can (?:do that|help with that)[.!]\s*)?/gim, replace_with: "", label: "so you want me to" },
+    { pattern: /^(?:So,? )?(?:you )?(?:wanna|want to) know (?:about )?[^?\n]+\?\s*/gim, replace_with: "", label: "question hook" },
+    { pattern: /\bI can (?:do that|help with that)[.!]\s*/gi, replace_with: "", label: "I can do that" },
+
+    // Stock pivots
+    // Stops at ":" too, so "That sounds complicated, so think about it like this: <fact>." keeps the fact.
+    { pattern: /\bThat (?:sounds|might sound|may sound) (?:complicated|confusing|abstract|technical|weird)[^.!?:\n]*[.!?:]\s*/gi, replace_with: "", label: "that sounds complicated" },
+    { pattern: /\b(?:Yeah,?\s+)?(?:It |That )?sounds (?:technical|weird|complicated|confusing|crazy|strange)(?:, right)?\?\s*/gi, replace_with: "", label: "sounds weird, right?" },
+    { pattern: /(?:Okay,?\s+)?(?:So,?\s+)?(?:let me|let's) (?:break (?:it|this) down|unpack (?:it|this))(?: (?:for you|simply|without the jargon|step by step|a bit))?(?:,[^.!?\n]*)?[.!:]\s*/gi, replace_with: "", label: "let me break it down" },
+    { pattern: /\bHere's the (?:simplest|easiest|best) way to (?:understand|think about|picture|get|put) (?:it|this)[:.]\s*/gi, replace_with: "", label: "simplest way to understand it" },
+    { pattern: /\bHere's the thing[:,]\s*/gi, replace_with: "", label: "here's the thing" },
+    { pattern: /\bThe thing is,\s*/gi, replace_with: "", label: "the thing is" },
+    { pattern: /\bThink about it this way[:.]\s*/gi, replace_with: "", label: "think about it this way" },
+    { pattern: /\bThink about this for a moment[.:]\s*/gi, replace_with: "", label: "think about this for a moment" },
+    { pattern: /\b(?:Now,?\s+)?(?:Here's|This is) where (?:things|it) gets? (?:really )?(?:interesting|weird|cool|wild|crazy)\s*[-–—.:!]\s*/gi, replace_with: "", label: "here's where it gets interesting" },
+    { pattern: /\b(?:But )?here's the twist\s*[-–—.:]\s*/gi, replace_with: "", label: "here's the twist" },
+    { pattern: /\bBut there's a twist[.:]\s*/gi, replace_with: "", label: "here's the twist" },
+    // The "But" goes too: "But here's the key part:\n\nEmpty space..." would leave "But Empty space".
+    { pattern: /\b(?:But |And )?here's the (?:key|important|crucial|big) (?:part|point|distinction|difference)\s*[:.]\s*/gi, replace_with: "", label: "here's the key part" },
+    { pattern: /\bHere's the big picture(?: connecting back to [^:\n]+)?:\s*/gi, replace_with: "", label: "here's the big picture" },
+    { pattern: /(?<![*\w])\*([^*\s](?:[^*\n]{0,38}[^*\s])?)\*(?![*\w])/g, replace_with: "$1", label: "markdown italics" },
+    { pattern: /\bAnd get this\s*[-–—:,]\s*/gi, replace_with: "", label: "and get this" },
+    { pattern: /\bOh,? and one more thing[:.]\s*/gi, replace_with: "", label: "one more thing" },
+    { pattern: /\bThis is the (?:really )?interesting part[.:!]\s*/gi, replace_with: "", label: "the interesting part" },
+    { pattern: /\b(?:And )?(?:that's|here's) the (?:really )?mind-blowing part[:.!]\s*/gi, replace_with: "", label: "mind-blowing part" },
+    { pattern: /\bHere's what happens:\s*/gi, replace_with: "", label: "here's what happens" },
+    { pattern: /\bSo the setup was this:\s*/gi, replace_with: "", label: "the setup was this" },
+    { pattern: /\bNow let's take it one step further[.:]\s*/gi, replace_with: "", label: "one step further" },
+    { pattern: /\bIn a very real sense,\s*/gi, replace_with: "", label: "in a very real sense" },
+    { pattern: /\b(?:So,?\s+|And\s+)?(?:here's|Here's) the (?:deal|kicker)(?:\.{3}|[.:!,])?\s*/g, replace_with: "", label: "here's the kicker" },
+    { pattern: /\bThe real kicker\?\s*/gi, replace_with: "", label: "the real kicker" },
+    { pattern: /\s*\b(?:But )?(?:that's|that is) (?:a(?:nother)? story|a topic) for (?:later|another (?:day|time))[.!]/gi, replace_with: "", label: "another story for later" },
+
+    // References to a conversation the reader never saw
+    { pattern: /\b(?:So,?\s+)?(?:let's|let me) connect this (?:back )?to your (?:original )?question about ([^.!?\n]+)[.!]/gi, replace_with: "Back to $1.", label: "your original question" },
+    { pattern: /\b(?:as|like) (?:I|we) (?:mentioned|said|discussed|covered) (?:earlier|before|above),?\s*/gi, replace_with: "", label: "as I mentioned" },
+    { pattern: /\b(?:our|the|my) (?:earlier|previous) (?:discussion|conversation|answer) about\s+/gi, replace_with: "", label: "our earlier discussion" },
+
+    // "Want to know more?" sign-offs
+    { pattern: /(?:And )?if you(?:'d)? (?:want|like) to (?:explore|learn|dig|know|go)(?: into it)? (?:more|further|deeper)[^.!?\n]*[.!?]\s*/gi, replace_with: "", label: "if you want to explore more" },
+    { pattern: /\bOne thing worth exploring next is[^.!?\n]*[.!?]\s*/gi, replace_with: "", label: "worth exploring next" },
+    { pattern: /\bIf you're curious[^.!?\n]*that's where[^.!?\n]*[.!]\s*/gi, replace_with: "", label: "if you're curious" },
+    { pattern: /\bThat's where [^.!?\n]{0,40}? gets? (?:really |even )?(?:fascinating|interesting|wild|weird|weirder)[.!]\s*/gi, replace_with: "", label: "where it gets fascinating" },
+    { pattern: /\bSo,? here's how I'd sum(?:marize| it up| up)[^:.\n]*[:.]\s*/gi, replace_with: "", label: "here's how I'd summarize" },
+    { pattern: /\bSo,? (?:these|those) are the (?:tools|options|ones) I(?:'ve| have) found[^.!?\n]*[.!]\s*/gi, replace_with: "", label: "the tools I've found" },
+    { pattern: /\b(?:Let me know if|Would you like me to|Want me to|If you'd like, I can)[^.!?\n]*[.!?]\s*/gi, replace_with: "", label: "follow-up offer" }
+];
+
 export const structural_cleanup: Replacement[] =
 [
     // Strip markdown bold list item headers: "- **Title:** text" -> "- Title: text" or plain talk

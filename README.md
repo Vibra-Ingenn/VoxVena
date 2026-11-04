@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.jpg" alt="Vox Vena: AI to human" width="100%">
+</p>
+
 # Vox Vena
 
 Paste text that sounds like an AI wrote it. Get it back sounding like a person said it.
@@ -14,19 +18,19 @@ Paste text that sounds like an AI wrote it. Get it back sounding like a person s
 | Ultimately, fostering collaboration remains paramount to success. | In the end, building collaboration remains key to success. |
 | In conclusion, this comprehensive guide will delve into best practices. | This guide will look at best practices. |
 
-These come from the **Light** setting, with no AI involved. Every rule is a plain word swap you can read in `src/ai_tells.ts` and `src/spoken_pass.ts`.
+These come from the **Light** setting, with no AI involved. Every rule is plain, readable code in `src/ai_tells.ts` and `src/spoken_pass.ts`.
 
 Three strengths:
 
 | Level | What it changes |
 |---|---|
-| Light | Phrase swaps only |
-| Medium | Phrases plus structure cleanup (list cadence, same-length paragraphs, stiff openers) |
-| Heavy | All of the above plus contractions; the optional AI pass is freer |
+| Light | Phrase swaps, plus chatbot habits removed ("Let me break it down", "Here's the thing", "you could ask..." endings, ChatGPT link leftovers). Keeps your layout |
+| Medium | Light, plus structure: headings dropped, short lists turned into sentences, one-sentence paragraphs joined into paragraphs of different lengths |
+| Heavy | Medium, plus warm-up and wrap-up lines cut ("This is one of the most fascinating things...", "The thought I'd like you to take away") |
 
 ## Run it
 
-You need [Node.js](https://nodejs.org) 18 or newer.
+You need [Node.js](https://nodejs.org) 22 or newer.
 
 ```bash
 npm install
@@ -47,7 +51,9 @@ HUMANIZER_MODEL=local
 HUMANIZER_API_KEY=janus
 ```
 
-Then tick **LLM roughen** (used on Medium and Heavy; Light never calls a model). Leave it unticked to stay fully offline.
+Then tick **Also rewrite with my AI** (used on Medium and Heavy; Light never calls a model). The rules run again on whatever the model sends back, because models add their own chatbot habits. If the rewrite wanders off from what you wrote, Vox Vena throws it away, keeps the rules-only version and says so. Leave it unticked to stay fully offline.
+
+Two things we saw in testing: bigger models write better rewrites, and small ones add their own chatbot habits (the rules then take those out). And if your text already sounds like you, leave the box off: in our tests, the AI smoothed away the best human touches.
 
 ## Your own voice
 
@@ -71,9 +77,9 @@ curl -X POST http://127.0.0.1:8787/api/humanize \
 - A careful human edit still wins. This gets you most of the way fast.
 - English only for now.
 
-## Support Vox Vena
+## Like it?
 
-Vox Vena is free and stays free. Sponsorship keeps it updated with new rules, better voice packs and more languages. If it saves you time, please consider sponsoring it.
+Vox Vena is free and stays free. If it saves you time, a star on GitHub helps other people find it.
 
 Want it to run by itself, like cleaning every draft in a folder? **Vibe Engine**, my paid tool, runs Vox Vena and my other tools together, the same way every time: [adeptuscamini.com](https://adeptuscamini.com). Either way, thanks for using it.
 
