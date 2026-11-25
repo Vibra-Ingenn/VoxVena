@@ -18,7 +18,7 @@ Paste text that sounds like an AI wrote it. Get it back sounding like a person s
 | Ultimately, fostering collaboration remains paramount to success. | In the end, building collaboration remains key to success. |
 | In conclusion, this comprehensive guide will delve into best practices. | This guide will look at best practices. |
 
-These come from the **Light** setting, with no AI involved: plain rules, the same every time.
+These come from the **Light** setting, with no AI involved. Every rule is plain, readable code in `src/ai_tells.ts` and `src/spoken_pass.ts`.
 
 Three strengths:
 
@@ -32,7 +32,12 @@ Three strengths:
 
 **Windows, no setup:** download **[VoxVena-windows.zip](../../releases/latest/download/VoxVena-windows.zip)**, unzip it, and double-click `Start Vox Vena.bat`. It comes with everything it needs (Node.js included). Windows may say "Windows protected your PC" the first time because Vox Vena is new: click **More info**, then **Run anyway**.
 
-**Linux:** you need [Node.js](https://nodejs.org) 22 or newer. Download **[VoxVena-linux.tar.gz](../../releases/latest/download/VoxVena-linux.tar.gz)**, unpack it (`tar xzf VoxVena-linux.tar.gz`) and run `./VoxVena/start.sh`.
+**From source** (any system): you need [Node.js](https://nodejs.org) 22 or newer.
+
+```bash
+npm install
+npm start
+```
 
 Open http://127.0.0.1:8787, paste your text and pick a strength.
 
@@ -52,9 +57,34 @@ Then tick **Also rewrite with my AI** (used on Medium and Heavy; Light never cal
 
 Two things we saw in testing: bigger models write better rewrites, and small ones add their own chatbot habits (the rules then take those out). And if your text already sounds like you, leave the box off: in our tests, the AI smoothed away the best human touches.
 
-## Your own voice
+## Sound like you (Google Takeout)
 
-A voice pack is a small JSON file describing how you write: what to do, what to avoid, words you like, a few example sentences. The example is `app/fixtures/example_voice_style.json` in the download. Make your own and point Vox Vena at it:
+You can teach Vox Vena your writing habits from **your own** Google Takeout — the same export Google gives you for free.
+
+**Language honesty:** made and tested with **English** Google accounts. We keep a small table of non-English action labels as a best guess (unverified). If your account is not in English, export **JSON**; if the scan finds activity but no messages, the app tells you to try JSON.
+
+1. Open [takeout.google.com](https://takeout.google.com).
+2. Click **Deselect all**, then tick only **My Activity**.
+3. Under format, choose **JSON** (especially if your account is not in English).
+4. Export and download the zip file(s). Google may split a big export into `takeout-…-001.zip`, `002.zip`, and so on — drop **all** parts at once (or pick them together).
+5. In the app, open **Sound like you**, drop the zip(s) or an **unzipped Takeout folder**, skim the sample (each line shows whether it came from Gemini, Search, and so on), remove anything private, then click **Build my voice**.
+
+**Searches are off by default** (short queries like “weather” are not how you write). Turn on **Also learn from my longer searches (8+ words)** if you want those included.
+
+Nothing in this flow is uploaded to the internet. Takeout zips are read on your PC only (large zips are streamed; only My Activity files are opened). Your messages and the voice pack are stored in a private data folder (on Linux `~/.local/share/vox-vena/`), not in the git repo. Voice recordings in Takeout are counted but not used yet.
+
+Command line (same privacy rules):
+
+```bash
+npm run voice -- import /path/to/takeout.zip /path/to/takeout-002.zip
+npm run voice -- import --with-searches /path/to/unzipped-takeout-folder
+```
+
+**Gaps (honest):** Gmail sent mail is not used yet. Assistant “Searched for” lines follow the same search rules as Google Search. Voice clips are counted only, not cloned here.
+
+## Your own voice (manual JSON)
+
+A voice pack is a small JSON file describing how you write: what to do, what to avoid, words you like, a few example sentences. The example is `src/fixtures/example_voice_style.json`. Make your own and point Vox Vena at it:
 
 ```env
 HUMANIZER_VOICE_PATH=./my_voice.json
@@ -80,10 +110,10 @@ Vox Vena is free and stays free. If it saves you time, a star on GitHub helps ot
 
 Want it to run by itself, like cleaning every draft in a folder? **Vibe Engine**, my paid tool, runs Vox Vena and my other tools together, the same way every time: [adeptuscamini.com](https://adeptuscamini.com). Either way, thanks for using it.
 
-## Licence
+## License
 
-Vox Vena is freeware: free to use for personal and business work, on as many computers as you like. The source code is not public. See [LICENSE.txt](LICENSE.txt). Versions released before 2026-11-22 stay under the MIT licence.
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-<p align="center"><i lang="la" title="We refuse to keep doing the same broken things; we do other things.">Recusamus pergere eadem fracta facere; nos alia facimus.</i></p>
+<p align="center"><i lang="la" title="We refuse to accept the same broken things, we build differently!">Recusamus eadem fracta accipere. Nos aliter aedificamus.</i><br><sub>We refuse to accept the same broken things, we build differently!</sub></p>
